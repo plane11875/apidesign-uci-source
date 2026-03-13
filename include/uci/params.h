@@ -1,0 +1,122 @@
+/*
+ * UCI Parameters Interface
+ * Wrapper for OpenSSL parameters functionality
+ */
+
+#ifndef UCI_PARAMS_H
+#define UCI_PARAMS_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Include OpenSSL params headers */
+#include <openssl/params.h>
+
+/* UCI parameter type (already defined in core.h, but included here for convenience) */
+typedef OSSL_PARAM UCI_PARAM;
+typedef OSSL_PARAM_BLD UCI_PARAM_BLD;
+
+/* UCI parameter macros */
+#define UCI_PARAM_UNMODIFIED OSSL_PARAM_UNMODIFIED
+#define UCI_PARAM_END OSSL_PARAM_END
+#define UCI_PARAM_DEFN OSSL_PARAM_DEFN
+
+/* Basic parameter type macros */
+#define UCI_PARAM_int OSSL_PARAM_int
+#define UCI_PARAM_uint OSSL_PARAM_uint
+#define UCI_PARAM_long OSSL_PARAM_long
+#define UCI_PARAM_ulong OSSL_PARAM_ulong
+#define UCI_PARAM_int32 OSSL_PARAM_int32
+#define UCI_PARAM_uint32 OSSL_PARAM_uint32
+#define UCI_PARAM_int64 OSSL_PARAM_int64
+#define UCI_PARAM_uint64 OSSL_PARAM_uint64
+#define UCI_PARAM_size_t OSSL_PARAM_size_t
+#define UCI_PARAM_time_t OSSL_PARAM_time_t
+#define UCI_PARAM_double OSSL_PARAM_double
+#define UCI_PARAM_BN OSSL_PARAM_BN
+#define UCI_PARAM_utf8_string OSSL_PARAM_utf8_string
+#define UCI_PARAM_octet_string OSSL_PARAM_octet_string
+#define UCI_PARAM_utf8_ptr OSSL_PARAM_utf8_ptr
+#define UCI_PARAM_octet_ptr OSSL_PARAM_octet_ptr
+
+/* UCI parameter functions */
+#define UCI_PARAM_locate OSSL_PARAM_locate
+#define UCI_PARAM_locate_const OSSL_PARAM_locate_const
+#define UCI_PARAM_construct_int OSSL_PARAM_construct_int
+#define UCI_PARAM_construct_uint OSSL_PARAM_construct_uint
+#define UCI_PARAM_construct_long OSSL_PARAM_construct_long
+#define UCI_PARAM_construct_ulong OSSL_PARAM_construct_ulong
+#define UCI_PARAM_construct_int32 OSSL_PARAM_construct_int32
+#define UCI_PARAM_construct_uint32 OSSL_PARAM_construct_uint32
+#define UCI_PARAM_construct_int64 OSSL_PARAM_construct_int64
+#define UCI_PARAM_construct_uint64 OSSL_PARAM_construct_uint64
+#define UCI_PARAM_construct_size_t OSSL_PARAM_construct_size_t
+#define UCI_PARAM_construct_time_t OSSL_PARAM_construct_time_t
+#define UCI_PARAM_construct_BN OSSL_PARAM_construct_BN
+#define UCI_PARAM_construct_double OSSL_PARAM_construct_double
+#define UCI_PARAM_construct_utf8_string OSSL_PARAM_construct_utf8_string
+#define UCI_PARAM_construct_utf8_ptr OSSL_PARAM_construct_utf8_ptr
+#define UCI_PARAM_construct_octet_string OSSL_PARAM_construct_octet_string
+#define UCI_PARAM_construct_octet_ptr OSSL_PARAM_construct_octet_ptr
+#define UCI_PARAM_construct_end OSSL_PARAM_construct_end
+
+#define UCI_PARAM_allocate_from_text OSSL_PARAM_allocate_from_text
+#define UCI_PARAM_get_int OSSL_PARAM_get_int
+#define UCI_PARAM_get_uint OSSL_PARAM_get_uint
+#define UCI_PARAM_get_long OSSL_PARAM_get_long
+#define UCI_PARAM_get_ulong OSSL_PARAM_get_ulong
+#define UCI_PARAM_get_int32 OSSL_PARAM_get_int32
+#define UCI_PARAM_get_uint32 OSSL_PARAM_get_uint32
+#define UCI_PARAM_get_int64 OSSL_PARAM_get_int64
+#define UCI_PARAM_get_uint64 OSSL_PARAM_get_uint64
+#define UCI_PARAM_get_size_t OSSL_PARAM_get_size_t
+#define UCI_PARAM_get_time_t OSSL_PARAM_get_time_t
+#define UCI_PARAM_get_BN OSSL_PARAM_get_BN
+#define UCI_PARAM_get_double OSSL_PARAM_get_double
+#define UCI_PARAM_get_utf8_string OSSL_PARAM_get_utf8_string
+#define UCI_PARAM_get_octet_string OSSL_PARAM_get_octet_string
+#define UCI_PARAM_get_utf8_ptr OSSL_PARAM_get_utf8_ptr
+#define UCI_PARAM_get_octet_ptr OSSL_PARAM_get_octet_ptr
+
+#define UCI_PARAM_set_int OSSL_PARAM_set_int
+#define UCI_PARAM_set_uint OSSL_PARAM_set_uint
+#define UCI_PARAM_set_long OSSL_PARAM_set_long
+#define UCI_PARAM_set_ulong OSSL_PARAM_set_ulong
+#define UCI_PARAM_set_int32 OSSL_PARAM_set_int32
+#define UCI_PARAM_set_uint32 OSSL_PARAM_set_uint32
+#define UCI_PARAM_set_int64 OSSL_PARAM_set_int64
+#define UCI_PARAM_set_uint64 OSSL_PARAM_set_uint64
+#define UCI_PARAM_set_size_t OSSL_PARAM_set_size_t
+#define UCI_PARAM_set_time_t OSSL_PARAM_set_time_t
+#define UCI_PARAM_set_BN OSSL_PARAM_set_BN
+#define UCI_PARAM_set_double OSSL_PARAM_set_double
+#define UCI_PARAM_set_utf8_string OSSL_PARAM_set_utf8_string
+#define UCI_PARAM_set_octet_string OSSL_PARAM_set_octet_string
+#define UCI_PARAM_set_utf8_ptr OSSL_PARAM_set_utf8_ptr
+#define UCI_PARAM_set_octet_ptr OSSL_PARAM_set_octet_ptr
+
+/* Parameter builder functions */
+#define UCI_PARAM_BLD_new OSSL_PARAM_BLD_new
+#define UCI_PARAM_BLD_free OSSL_PARAM_BLD_free
+#define UCI_PARAM_BLD_to_param OSSL_PARAM_BLD_to_param
+#define UCI_PARAM_BLD_push_int OSSL_PARAM_BLD_push_int
+#define UCI_PARAM_BLD_push_uint OSSL_PARAM_BLD_push_uint
+#define UCI_PARAM_BLD_push_long OSSL_PARAM_BLD_push_long
+#define UCI_PARAM_BLD_push_ulong OSSL_PARAM_BLD_push_ulong
+#define UCI_PARAM_BLD_push_int32 OSSL_PARAM_BLD_push_int32
+#define UCI_PARAM_BLD_push_uint32 OSSL_PARAM_BLD_push_uint32
+#define UCI_PARAM_BLD_push_int64 OSSL_PARAM_BLD_push_int64
+#define UCI_PARAM_BLD_push_uint64 OSSL_PARAM_BLD_push_uint64
+#define UCI_PARAM_BLD_push_size_t OSSL_PARAM_BLD_push_size_t
+#define UCI_PARAM_BLD_push_time_t OSSL_PARAM_BLD_push_time_t
+#define UCI_PARAM_BLD_push_double OSSL_PARAM_BLD_push_double
+#define UCI_PARAM_BLD_push_BN OSSL_PARAM_BLD_push_BN
+#define UCI_PARAM_BLD_push_utf8_string OSSL_PARAM_BLD_push_utf8_string
+#define UCI_PARAM_BLD_push_octet_string OSSL_PARAM_BLD_push_octet_string
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* UCI_PARAMS_H */
