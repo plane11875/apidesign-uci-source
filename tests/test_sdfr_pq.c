@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,18 +6,42 @@
 
 #include "uci/sdf.h"
 
-#define TEST_ALGID_MLDSA ((ULONG)0x00F0D501u)
-#define TEST_ALGID_MLKEM ((ULONG)0x00F0D502u)
+#define DEFAULT_SIGN_ALGID ((ULONG)0x00F0D501u)
+#define DEFAULT_KEM_ALGID  ((ULONG)0x00F0D502u)
+#define DEFAULT_SIGN_ALG   "mldsa65"
+#define DEFAULT_KEM_ALG    "mlkem768"
 
-static int write_patch_file(const char *path, const char *provider)
+static ULONG parse_algid_env(const char *name, ULONG fallback)
+{
+    const char *v = getenv(name);
+    char *end = NULL;
+    unsigned long x;
+
+    if (v == NULL || v[0] == '\0')
+        return fallback;
+
+    errno = 0;
+    x = strtoul(v, &end, 0);
+    if (errno != 0 || end == v || (end != NULL && *end != '\0') || x > 0xFFFFFFFFul)
+        return fallback;
+
+    return (ULONG)x;
+}
+
+static int write_patch_file(const char *path,
+                            ULONG sign_algid,
+                            const char *sign_alg,
+                            ULONG kem_algid,
+                            const char *kem_alg,
+                            const char *provider)
 {
     FILE *fp = fopen(path, "w");
     if (fp == NULL)
         return 0;
 
     /* format: <algid> <algorithm> <properties> */
-    fprintf(fp, "0x%08X mldsa65 provider=%s\n", TEST_ALGID_MLDSA, provider);
-    fprintf(fp, "0x%08X mlkem768 provider=%s\n", TEST_ALGID_MLKEM, provider);
+    fprintf(fp, "0x%08X %s provider=%s\n", sign_algid, sign_alg, provider);
+    fprintf(fp, "0x%08X %s provider=%s\n", kem_algid, kem_alg, provider);
 
     fclose(fp);
     return 1;
@@ -30,6 +55,11 @@ static void print_rc(const char *step, LONG rc)
 int main(int argc, char **argv)
 {
     const char *provider = getenv("UCI_TEST_PROVIDER");
+    const char *sign_alg = getenv("UCI_TEST_SIGN_ALG");
+    const char *kem_alg = getenv("UCI_TEST_KEM_ALG");
+    ULONG sign_algid = parse_algid_env("UCI_TEST_SIGN_ALGID", DEFAULT_SIGN_ALGID);
+    ULONG kem_algid = parse_algid_env("UCI_TEST_KEM_ALGID", DEFAULT_KEM_ALGID);
+
     const char *patch_file = "/tmp/sdfr_pq_patch.conf";
     char props[256];
 
@@ -61,13 +91,17 @@ int main(int argc, char **argv)
 
     if (provider == NULL || provider[0] == '\0')
         provider = (argc > 1) ? argv[1] : "myoqsprov";
+    if (sign_alg == NULL || sign_alg[0] == '\0')
+        sign_alg = DEFAULT_SIGN_ALG;
+    if (kem_alg == NULL || kem_alg[0] == '\0')
+        kem_alg = DEFAULT_KEM_ALG;
 
     if (snprintf(props, sizeof(props), "provider=%s", provider) >= (int)sizeof(props)) {
         fprintf(stderr, "[FAIL] provider name too long\n");
         return 2;
     }
 
-    if (!write_patch_file(patch_file, provider)) {
+    if (!write_patch_file(patch_file, sign_algid, sign_alg, kem_algid, kem_alg, provider)) {
         fprintf(stderr, "[FAIL] write patch file failed: %s\n", patch_file);
         return 2;
     }
@@ -88,20 +122,18 @@ int main(int argc, char **argv)
     rc = SDFU_LoadProvider(sess, (const CHAR *)provider, &prov);
     if (rc != SDR_OK) {
         fprintf(stderr,
-                "[SKIP] provider '%s' load failed (rc=0x%08X). "
-                "Build/install provider first, then rerun.\n",
+                "[SKIP] provider '%s' load failed (rc=0x%08X). Build/install provider first, then rerun.\n",
                 provider, (unsigned int)rc);
         exit_code = 77;
         goto cleanup;
     }
 
-    /* ML-DSA sign/verify */
-    rc = SDFU_GenerateKeyPair(sess, (const CHAR *)"mldsa65", (const CHAR *)props, &sign_key);
+    /* sign/verify */
+    rc = SDFU_GenerateKeyPair(sess, (const CHAR *)sign_alg, (const CHAR *)props, &sign_key);
     if (rc != SDR_OK) {
         fprintf(stderr,
-                "[SKIP] generate mldsa65 key failed (rc=0x%08X). "
-                "Provider may not expose mldsa65.\n",
-                (unsigned int)rc);
+                "[SKIP] generate %s key failed (rc=0x%08X). Provider may not expose this sign alg.\n",
+                sign_alg, (unsigned int)rc);
         exit_code = 77;
         goto cleanup;
     }
@@ -109,7 +141,7 @@ int main(int argc, char **argv)
     memset(&req, 0, sizeof(req));
     memset(&rsp, 0, sizeof(rsp));
     req.uiOperation = SDFR_OP_SIGN;
-    req.uiAlgID = TEST_ALGID_MLDSA;
+    req.uiAlgID = sign_algid;
     req.hKeyHandle = sign_key;
     req.pucInput = msg;
     req.uiInputLength = (ULONG)(sizeof(msg) - 1);
@@ -130,7 +162,7 @@ int main(int argc, char **argv)
     memset(&req, 0, sizeof(req));
     memset(&rsp, 0, sizeof(rsp));
     req.uiOperation = SDFR_OP_SIGN;
-    req.uiAlgID = TEST_ALGID_MLDSA;
+    req.uiAlgID = sign_algid;
     req.hKeyHandle = sign_key;
     req.pucInput = msg;
     req.uiInputLength = (ULONG)(sizeof(msg) - 1);
@@ -146,7 +178,7 @@ int main(int argc, char **argv)
     memset(&req, 0, sizeof(req));
     memset(&rsp, 0, sizeof(rsp));
     req.uiOperation = SDFR_OP_VERIFY;
-    req.uiAlgID = TEST_ALGID_MLDSA;
+    req.uiAlgID = sign_algid;
     req.hKeyHandle = sign_key;
     req.pucInput = msg;
     req.uiInputLength = (ULONG)(sizeof(msg) - 1);
@@ -159,13 +191,12 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
-    /* ML-KEM encapsulate/decapsulate */
-    rc = SDFU_GenerateKeyPair(sess, (const CHAR *)"mlkem768", (const CHAR *)props, &kem_key);
+    /* kem encapsulate/decapsulate */
+    rc = SDFU_GenerateKeyPair(sess, (const CHAR *)kem_alg, (const CHAR *)props, &kem_key);
     if (rc != SDR_OK) {
         fprintf(stderr,
-                "[SKIP] generate mlkem768 key failed (rc=0x%08X). "
-                "Provider may not expose mlkem768.\n",
-                (unsigned int)rc);
+                "[SKIP] generate %s key failed (rc=0x%08X). Provider may not expose this KEM alg.\n",
+                kem_alg, (unsigned int)rc);
         exit_code = 77;
         goto cleanup;
     }
@@ -173,7 +204,7 @@ int main(int argc, char **argv)
     memset(&req, 0, sizeof(req));
     memset(&rsp, 0, sizeof(rsp));
     req.uiOperation = SDFR_OP_KEM_ENCAPSULATE;
-    req.uiAlgID = TEST_ALGID_MLKEM;
+    req.uiAlgID = kem_algid;
     req.hKeyHandle = kem_key;
 
     rsp.puiOutputLength = &ss1_len;
@@ -194,7 +225,7 @@ int main(int argc, char **argv)
     memset(&req, 0, sizeof(req));
     memset(&rsp, 0, sizeof(rsp));
     req.uiOperation = SDFR_OP_KEM_ENCAPSULATE;
-    req.uiAlgID = TEST_ALGID_MLKEM;
+    req.uiAlgID = kem_algid;
     req.hKeyHandle = kem_key;
 
     rsp.pucOutput = ss1;
@@ -217,7 +248,7 @@ int main(int argc, char **argv)
     memset(&req, 0, sizeof(req));
     memset(&rsp, 0, sizeof(rsp));
     req.uiOperation = SDFR_OP_KEM_DECAPSULATE;
-    req.uiAlgID = TEST_ALGID_MLKEM;
+    req.uiAlgID = kem_algid;
     req.hKeyHandle = kem_key;
     req.pucExtraInput = ct;
     req.uiExtraInputLength = ct_len;
@@ -236,7 +267,10 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
-    printf("[PASS] SDFR ML-DSA sign/verify + ML-KEM encap/decap via provider=%s\n", provider);
+    printf("[PASS] SDFR sign/verify(%s,0x%08X) + KEM(%s,0x%08X) via provider=%s\n",
+           sign_alg, (unsigned int)sign_algid,
+           kem_alg, (unsigned int)kem_algid,
+           provider);
     exit_code = 0;
 
 cleanup:
