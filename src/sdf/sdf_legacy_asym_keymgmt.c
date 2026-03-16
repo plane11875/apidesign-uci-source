@@ -688,7 +688,7 @@ static LONG unified_ipk_try_sdfr(HANDLE hSessionHandle, ULONG uiKeyBits, ULONG u
     ULONG session_len = 0;
     LONG rc;
 
-    if (hInternalPublicKey == NULL || pucKey == NULL || puiKeyLength == NULL || phKeyHandle == NULL)
+    if (hInternalPublicKey == NULL || puiKeyLength == NULL || phKeyHandle == NULL)
         return SDR_INARGERR;
 
     rc = SDFR_ResolveAlgName(uiAlgID, &alg, &props);
@@ -705,8 +705,10 @@ static LONG unified_ipk_try_sdfr(HANDLE hSessionHandle, ULONG uiKeyBits, ULONG u
 
     rc = SDFR_Execute(hSessionHandle, &req, &rsp);
     if (rc == SDR_OK && secret_len > 0 && ct_len > 0) {
-        if (*puiKeyLength < ct_len)
+        if (pucKey == NULL || *puiKeyLength < ct_len) {
+            *puiKeyLength = ct_len;
             return SDR_OUTARGERR;
+        }
 
         secret = (BYTE *)malloc(secret_len);
         if (secret == NULL)
@@ -761,7 +763,8 @@ static LONG unified_ipk_try_sdfr(HANDLE hSessionHandle, ULONG uiKeyBits, ULONG u
         return (rc == SDR_OK) ? SDR_ALGNOTSUPPORT : rc;
     }
 
-    if (*puiKeyLength < ct_len) {
+    if (pucKey == NULL || *puiKeyLength < ct_len) {
+        *puiKeyLength = ct_len;
         OPENSSL_cleanse(session, session_len);
         free(session);
         return SDR_OUTARGERR;
@@ -975,7 +978,7 @@ static LONG unified_epk_try_sdfr(HANDLE hSessionHandle, ULONG uiKeyBits, ULONG u
     ULONG session_len = 0;
     LONG rc;
 
-    if (hPublicKey == NULL || pucKey == NULL || puiKeyLength == NULL || phKeyHandle == NULL)
+    if (hPublicKey == NULL || puiKeyLength == NULL || phKeyHandle == NULL)
         return SDR_INARGERR;
 
     rc = SDFR_ResolveAlgName(uiAlgID, &alg, &props);
@@ -991,8 +994,10 @@ static LONG unified_epk_try_sdfr(HANDLE hSessionHandle, ULONG uiKeyBits, ULONG u
     rsp.puiExtraOutputLength = &ct_len;
     rc = SDFR_Execute(hSessionHandle, &req, &rsp);
     if (rc == SDR_OK && secret_len > 0 && ct_len > 0) {
-        if (*puiKeyLength < ct_len)
+        if (pucKey == NULL || *puiKeyLength < ct_len) {
+            *puiKeyLength = ct_len;
             return SDR_OUTARGERR;
+        }
 
         secret = (BYTE *)malloc(secret_len);
         if (secret == NULL)
@@ -1047,7 +1052,8 @@ static LONG unified_epk_try_sdfr(HANDLE hSessionHandle, ULONG uiKeyBits, ULONG u
         return (rc == SDR_OK) ? SDR_ALGNOTSUPPORT : rc;
     }
 
-    if (*puiKeyLength < ct_len) {
+    if (pucKey == NULL || *puiKeyLength < ct_len) {
+        *puiKeyLength = ct_len;
         OPENSSL_cleanse(session, session_len);
         free(session);
         return SDR_OUTARGERR;

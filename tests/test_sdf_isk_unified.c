@@ -117,8 +117,8 @@ static int test_pq(HANDLE sess)
     HANDLE pub = NULL;
     HANDLE sk = NULL;
     HANDLE imported = NULL;
-    BYTE ct[8192];
-    ULONG ct_len = sizeof(ct);
+    BYTE *ct = NULL;
+    ULONG ct_len = 0;
     BYTE ss_dec[8192];
     ULONG ss_dec_len = sizeof(ss_dec);
     LONG rc;
@@ -152,17 +152,43 @@ static int test_pq(HANDLE sess)
     }
 
     {
-        BYTE pub_blob[8192];
-        ULONG pub_blob_len = sizeof(pub_blob);
-        rc = SDFU_ExportPublicKey(sess, sk, pub_blob, &pub_blob_len);
-        if (rc != SDR_OK)
+        BYTE *pub_blob = NULL;
+        ULONG pub_blob_len = 0;
+
+        rc = SDFU_ExportPublicKey(sess, sk, NULL, &pub_blob_len);
+        if (rc != SDR_OK || pub_blob_len == 0) {
+            fprintf(stderr, "[FAIL] export pq pub-len rc=0x%08X len=%u\n", (unsigned)rc, (unsigned)pub_blob_len);
             goto pq_cleanup;
+        }
+
+        pub_blob = (BYTE *)malloc(pub_blob_len);
+        if (pub_blob == NULL) {
+            fprintf(stderr, "[FAIL] alloc pq pub_blob len=%u\n", (unsigned)pub_blob_len);
+            rc = SDR_NOBUFFER;
+            goto pq_cleanup;
+        }
+
+        rc = SDFU_ExportPublicKey(sess, sk, pub_blob, &pub_blob_len);
+        if (rc != SDR_OK) {
+            fprintf(stderr, "[FAIL] export pq pub rc=0x%08X len=%u\n", (unsigned)rc, (unsigned)pub_blob_len);
+            free(pub_blob);
+            goto pq_cleanup;
+        }
+
         rc = SDFU_ImportPublicKey(sess, pub_blob, pub_blob_len,
                                   (const CHAR *)props, &pub);
-        if (rc != SDR_OK)
+        free(pub_blob);
+        if (rc != SDR_OK) {
+            fprintf(stderr, "[FAIL] import pq pub rc=0x%08X len=%u\n", (unsigned)rc, (unsigned)pub_blob_len);
             goto pq_cleanup;
+        }
     }
 
+    rc = SDF_GenerateKeyWithEPK(sess, 256, pq_algid, pub, NULL, &ct_len, &imported);
+    if (rc != SDR_OUTARGERR || ct_len == 0)
+        goto pq_cleanup;
+    ct = (BYTE *)malloc(ct_len);
+    if (ct == NULL) { rc = SDR_NOBUFFER; goto pq_cleanup; }
     rc = SDF_GenerateKeyWithEPK(sess, 256, pq_algid, pub, ct, &ct_len, &imported);
     if (rc != SDR_OK)
         goto pq_cleanup;
@@ -245,6 +271,8 @@ pq_cleanup:
         (void)SDF_DestroyKey(sess, pub);
     if (sk)
         (void)SDF_DestroyKey(sess, sk);
+    if (ct)
+        free(ct);
     if (prov)
         (void)SDFU_UnloadProvider(prov);
     unlink(patch_file);
