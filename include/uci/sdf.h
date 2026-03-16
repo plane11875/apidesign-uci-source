@@ -213,6 +213,12 @@ LONG SDF_GenerateKeyWithEPK(HANDLE hSessionHandle, ULONG uiKeyBits,
                             ULONG uiAlgID, const void *pucPublicKey,
                             BYTE *pucKey, ULONG *puiKeyLength,
                             HANDLE *phKeyHandle);
+/* 统一内部私钥解封装接口：按 uiAlgID 优先走 SDFR 路由，失败时回退 legacy。
+ */
+LONG SDF_ImportKeyWithISK(HANDLE hSessionHandle, ULONG uiISKIndex,
+                          ULONG uiAlgID, const void *pucPrivateKeyOrHandle,
+                          const BYTE *pucEncKey, ULONG uiEncKeyLength,
+                          HANDLE *phKeyHandle);
 LONG SDF_ImportKeyWithISK_ECC(HANDLE hSessionHandle, ULONG uiISKIndex,
                               ECCCipher *pucKey, HANDLE *phKeyHandle);
 LONG SDF_GenerateAgreementDataWithECC(HANDLE hSessionHandle, ULONG uiISKIndex,

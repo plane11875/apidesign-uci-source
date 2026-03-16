@@ -1,6 +1,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <openssl/bn.h>
 #include <openssl/core_names.h>
@@ -58,6 +59,9 @@ static LONG asym_call(HANDLE hSessionHandle, ULONG uiOp, const CHAR *pucAlgorith
 
     return rc;
 }
+
+static LONG legacy_SDF_ImportKeyWithISK_ECC(HANDLE hSessionHandle, ULONG uiISKIndex,
+                                            ECCCipher *pucKey, HANDLE *phKeyHandle);
 
 static int export_pub_blob(HANDLE hSessionHandle, HANDLE hKeyHandle,
                            BYTE **ppucBlob, ULONG *puiBlobLen)
@@ -873,9 +877,9 @@ end:
     return rc;
 }
 
-LONG SDF_ImportKeyWithISK_RSA(HANDLE hSessionHandle, ULONG uiISKIndex,
-                              BYTE *pucKey, ULONG uiKeyLength,
-                              HANDLE *phKeyHandle)
+static LONG legacy_SDF_ImportKeyWithISK_RSA(HANDLE hSessionHandle, ULONG uiISKIndex,
+                                    BYTE *pucKey, ULONG uiKeyLength,
+                                    HANDLE *phKeyHandle)
 {
     HANDLE hPrv = NULL;
     BYTE *plain = NULL;
@@ -1130,8 +1134,169 @@ LONG SDF_GenerateKeyWithEPK_ECC(HANDLE hSessionHandle, ULONG uiKeyBits,
                                              pucPublicKey, pucKey, phKeyHandle);
 }
 
+
+static LONG unified_isk_try_sdfr(HANDLE hSessionHandle, ULONG uiAlgID,
+                                 HANDLE hInternalPrivateKey,
+                                 const BYTE *pucEncKey, ULONG uiEncKeyLength,
+                                 HANDLE *phKeyHandle)
+{
+    const CHAR *alg = NULL;
+    const CHAR *props = NULL;
+    SDFR_REQUEST req;
+    SDFR_RESPONSE rsp;
+    BYTE *plain = NULL;
+    ULONG plain_len = 0;
+    LONG rc;
+
+    if (hInternalPrivateKey == NULL || pucEncKey == NULL || uiEncKeyLength == 0 || phKeyHandle == NULL)
+        return SDR_INARGERR;
+
+    rc = SDFR_ResolveAlgName(uiAlgID, &alg, &props);
+    if (rc != SDR_OK || alg == NULL)
+        return SDR_ALGNOTSUPPORT;
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_KEM_DECAPSULATE;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = hInternalPrivateKey;
+    req.pucExtraInput = pucEncKey;
+    req.uiExtraInputLength = uiEncKeyLength;
+    rsp.puiOutputLength = &plain_len;
+
+    rc = SDFR_Execute(hSessionHandle, &req, &rsp);
+    if (rc == SDR_OK && plain_len > 0) {
+        plain = (BYTE *)malloc(plain_len);
+        if (plain == NULL)
+            return SDR_NOBUFFER;
+
+        memset(&req, 0, sizeof(req));
+        memset(&rsp, 0, sizeof(rsp));
+        req.uiOperation = SDFR_OP_KEM_DECAPSULATE;
+        req.uiAlgID = uiAlgID;
+        req.hKeyHandle = hInternalPrivateKey;
+        req.pucExtraInput = pucEncKey;
+        req.uiExtraInputLength = uiEncKeyLength;
+        rsp.pucOutput = plain;
+        rsp.puiOutputLength = &plain_len;
+
+        rc = SDFR_Execute(hSessionHandle, &req, &rsp);
+        if (rc == SDR_OK)
+            rc = SDFU_ImportKey(hSessionHandle, plain, plain_len, phKeyHandle);
+
+        OPENSSL_cleanse(plain, plain_len);
+        free(plain);
+        return rc;
+    }
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_PKEY_DECRYPT;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = hInternalPrivateKey;
+    req.pucInput = pucEncKey;
+    req.uiInputLength = uiEncKeyLength;
+    rsp.puiOutputLength = &plain_len;
+
+    rc = SDFR_Execute(hSessionHandle, &req, &rsp);
+    if (rc != SDR_OK || plain_len == 0)
+        return (rc == SDR_OK) ? SDR_ALGNOTSUPPORT : rc;
+
+    plain = (BYTE *)malloc(plain_len);
+    if (plain == NULL)
+        return SDR_NOBUFFER;
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_PKEY_DECRYPT;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = hInternalPrivateKey;
+    req.pucInput = pucEncKey;
+    req.uiInputLength = uiEncKeyLength;
+    rsp.pucOutput = plain;
+    rsp.puiOutputLength = &plain_len;
+
+    rc = SDFR_Execute(hSessionHandle, &req, &rsp);
+    if (rc == SDR_OK)
+        rc = SDFU_ImportKey(hSessionHandle, plain, plain_len, phKeyHandle);
+
+    OPENSSL_cleanse(plain, plain_len);
+    free(plain);
+    return rc;
+}
+
+LONG SDF_ImportKeyWithISK(HANDLE hSessionHandle, ULONG uiISKIndex,
+                          ULONG uiAlgID, const void *pucPrivateKeyOrHandle,
+                          const BYTE *pucEncKey, ULONG uiEncKeyLength,
+                          HANDLE *phKeyHandle)
+{
+    if (hSessionHandle == NULL || phKeyHandle == NULL ||
+        pucEncKey == NULL || uiEncKeyLength == 0)
+        return SDR_INARGERR;
+
+    if (uiAlgID == SGD_RSA)
+        return legacy_SDF_ImportKeyWithISK_RSA(hSessionHandle, uiISKIndex,
+                                               (BYTE *)pucEncKey, uiEncKeyLength,
+                                               phKeyHandle);
+
+    if (uiAlgID == SGD_SM2 || uiAlgID == SGD_SM2_1 ||
+        uiAlgID == SGD_SM2_2 || uiAlgID == SGD_SM2_3) {
+        ECCCipher *ecc = NULL;
+        ULONG need = (ULONG)sizeof(ECCCipher);
+
+        if (uiEncKeyLength < need)
+            return SDR_ENCDATAERR;
+
+        ecc = (ECCCipher *)calloc(1, uiEncKeyLength);
+        if (ecc == NULL)
+            return SDR_NOBUFFER;
+        memcpy(ecc, pucEncKey, uiEncKeyLength);
+
+        if ((ULONG)sizeof(ECCCipher) + ecc->L - 1u > uiEncKeyLength) {
+            free(ecc);
+            return SDR_ENCDATAERR;
+        }
+
+        {
+            LONG rc = legacy_SDF_ImportKeyWithISK_ECC(hSessionHandle, uiISKIndex, ecc, phKeyHandle);
+            free(ecc);
+            return rc;
+        }
+    }
+
+    if (pucPrivateKeyOrHandle == NULL)
+        return SDR_INARGERR;
+
+    return unified_isk_try_sdfr(hSessionHandle, uiAlgID,
+                                (HANDLE)pucPrivateKeyOrHandle,
+                                pucEncKey, uiEncKeyLength,
+                                phKeyHandle);
+}
+
+LONG SDF_ImportKeyWithISK_RSA(HANDLE hSessionHandle, ULONG uiISKIndex,
+                              BYTE *pucKey, ULONG uiKeyLength,
+                              HANDLE *phKeyHandle)
+{
+    return SDF_ImportKeyWithISK(hSessionHandle, uiISKIndex, SGD_RSA,
+                                NULL, pucKey, uiKeyLength, phKeyHandle);
+}
+
 LONG SDF_ImportKeyWithISK_ECC(HANDLE hSessionHandle, ULONG uiISKIndex,
                               ECCCipher *pucKey, HANDLE *phKeyHandle)
+{
+    ULONG enc_len;
+
+    if (pucKey == NULL)
+        return SDR_INARGERR;
+
+    enc_len = (ULONG)sizeof(ECCCipher) + pucKey->L - 1u;
+    return SDF_ImportKeyWithISK(hSessionHandle, uiISKIndex, SGD_SM2_3,
+                                NULL, (const BYTE *)pucKey, enc_len, phKeyHandle);
+}
+
+
+static LONG legacy_SDF_ImportKeyWithISK_ECC(HANDLE hSessionHandle, ULONG uiISKIndex,
+                                    ECCCipher *pucKey, HANDLE *phKeyHandle)
 {
     HANDLE hPrv = NULL;
     LONG rc;

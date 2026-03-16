@@ -52,3 +52,6 @@ target_link_libraries(test_sdfu_myoqsprov_pq uci OpenSSL::Crypto)
 
 add_executable(test_sdf_ipk_unified tests/test_sdf_ipk_unified.c)
 target_link_libraries(test_sdf_ipk_unified uci OpenSSL::Crypto)
+
+add_executable(test_sdf_isk_unified tests/test_sdf_isk_unified.c)
+target_link_libraries(test_sdf_isk_unified uci OpenSSL::Crypto)
