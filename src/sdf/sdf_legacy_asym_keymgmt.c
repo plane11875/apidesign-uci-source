@@ -1473,6 +1473,209 @@ LONG SDF_ImportKeyWithKEK(HANDLE hSessionHandle, ULONG uiAlgID,
     return rc;
 }
 
+
+LONG SDF_ExternalPublicKeyOperation(HANDLE hSessionHandle, ULONG uiAlgID,
+                                    ULONG uiOpType,
+                                    const void *pucPublicKeyOrHandle,
+                                    const BYTE *pucDataInput, ULONG uiInputLength,
+                                    BYTE *pucDataOutput, ULONG *puiOutputLength)
+{
+    SDFR_REQUEST req;
+    SDFR_RESPONSE rsp;
+    LONG rc;
+
+    if (hSessionHandle == NULL || pucDataInput == NULL ||
+        puiOutputLength == NULL || (pucDataOutput == NULL && *puiOutputLength != 0))
+        return SDR_INARGERR;
+
+    if (uiAlgID == SGD_RSA) {
+        if (uiOpType != SDFR_OP_PKEY_ENCRYPT || pucPublicKeyOrHandle == NULL || puiOutputLength == NULL)
+            return SDR_INARGERR;
+        return SDF_ExternalPublicKeyOperation_RSA(hSessionHandle,
+                                                  (RSArefPublicKey *)pucPublicKeyOrHandle,
+                                                  (BYTE *)pucDataInput, uiInputLength,
+                                                  pucDataOutput, puiOutputLength);
+    }
+
+    if (uiAlgID == SGD_SM2 || uiAlgID == SGD_SM2_1 ||
+        uiAlgID == SGD_SM2_2 || uiAlgID == SGD_SM2_3) {
+        ULONG need;
+        if (uiOpType != SDFR_OP_PKEY_ENCRYPT || pucPublicKeyOrHandle == NULL || puiOutputLength == NULL)
+            return SDR_INARGERR;
+        need = (ULONG)sizeof(ECCCipher) + uiInputLength - 1u;
+        if (pucDataOutput == NULL || *puiOutputLength < need) {
+            *puiOutputLength = need;
+            return SDR_OUTARGERR;
+        }
+        {
+            LONG lrc = SDF_ExternalEncrypt_ECC(hSessionHandle, uiAlgID,
+                                               (ECCrefPublicKey *)pucPublicKeyOrHandle,
+                                               (BYTE *)pucDataInput, uiInputLength,
+                                               (ECCCipher *)pucDataOutput);
+            if (lrc == SDR_OK)
+                *puiOutputLength = need;
+            return lrc;
+        }
+    }
+
+    if (pucPublicKeyOrHandle == NULL)
+        return SDR_INARGERR;
+
+    if (uiOpType != SDFR_OP_PKEY_ENCRYPT)
+        return SDR_NOTSUPPORT;
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_PKEY_ENCRYPT;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = (HANDLE)pucPublicKeyOrHandle;
+    req.pucInput = pucDataInput;
+    req.uiInputLength = uiInputLength;
+    rsp.pucOutput = pucDataOutput;
+    rsp.puiOutputLength = puiOutputLength;
+
+    rc = SDFR_Execute(hSessionHandle, &req, &rsp);
+    return rc;
+}
+
+LONG SDF_InternalSign(HANDLE hSessionHandle, ULONG uiAlgID, ULONG uiISKIndex,
+                      const void *pucPrivateKeyOrHandle,
+                      const BYTE *pucData, ULONG uiDataLength,
+                      BYTE *pucSignature, ULONG *puiSignatureLength)
+{
+    SDFR_REQUEST req;
+    SDFR_RESPONSE rsp;
+    HANDLE hPrv = NULL;
+    LONG rc;
+
+    if (hSessionHandle == NULL || pucData == NULL || puiSignatureLength == NULL)
+        return SDR_INARGERR;
+
+    if (uiAlgID == SGD_SM2 || uiAlgID == SGD_SM2_1 ||
+        uiAlgID == SGD_SM2_2 || uiAlgID == SGD_SM2_3) {
+        ECCSignature sig;
+        LONG lrc;
+        if (pucSignature == NULL || *puiSignatureLength < (ULONG)sizeof(ECCSignature)) {
+            *puiSignatureLength = (ULONG)sizeof(ECCSignature);
+            return SDR_OUTARGERR;
+        }
+        lrc = SDF_InternalSign_ECC(hSessionHandle, uiISKIndex,
+                                   (BYTE *)pucData, uiDataLength, &sig);
+        if (lrc != SDR_OK)
+            return lrc;
+        memcpy(pucSignature, &sig, sizeof(sig));
+        *puiSignatureLength = (ULONG)sizeof(ECCSignature);
+        return SDR_OK;
+    }
+
+    if (pucPrivateKeyOrHandle != NULL)
+        hPrv = (HANDLE)pucPrivateKeyOrHandle;
+    else {
+        rc = sdf_store_get_internal_key(hSessionHandle, uiISKIndex,
+                                        (uiAlgID == SGD_RSA) ? 0 : 1, &hPrv);
+        if (rc != SDR_OK)
+            return rc;
+    }
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_SIGN;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = hPrv;
+    req.pucInput = pucData;
+    req.uiInputLength = uiDataLength;
+    rsp.pucOutput = pucSignature;
+    rsp.puiOutputLength = puiSignatureLength;
+
+    return SDFR_Execute(hSessionHandle, &req, &rsp);
+}
+
+LONG SDF_InternalVerify(HANDLE hSessionHandle, ULONG uiAlgID, ULONG uiIPKIndex,
+                        const void *pucPublicKeyOrHandle,
+                        const BYTE *pucData, ULONG uiDataLength,
+                        const BYTE *pucSignature, ULONG uiSignatureLength)
+{
+    SDFR_REQUEST req;
+    SDFR_RESPONSE rsp;
+    HANDLE hPub = NULL;
+    LONG rc;
+
+    if (hSessionHandle == NULL || pucData == NULL ||
+        pucSignature == NULL || uiSignatureLength == 0)
+        return SDR_INARGERR;
+
+    if (uiAlgID == SGD_SM2 || uiAlgID == SGD_SM2_1 ||
+        uiAlgID == SGD_SM2_2 || uiAlgID == SGD_SM2_3) {
+        if (uiSignatureLength < (ULONG)sizeof(ECCSignature))
+            return SDR_INARGERR;
+        return SDF_InternalVerify_ECC(hSessionHandle, uiIPKIndex,
+                                      (BYTE *)pucData, uiDataLength,
+                                      (ECCSignature *)pucSignature);
+    }
+
+    if (pucPublicKeyOrHandle != NULL)
+        hPub = (HANDLE)pucPublicKeyOrHandle;
+    else {
+        rc = sdf_store_get_internal_key(hSessionHandle, uiIPKIndex,
+                                        (uiAlgID == SGD_RSA) ? 0 : 1, &hPub);
+        if (rc != SDR_OK)
+            return rc;
+    }
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_VERIFY;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = hPub;
+    req.pucInput = pucData;
+    req.uiInputLength = uiDataLength;
+    req.pucExtraInput = pucSignature;
+    req.uiExtraInputLength = uiSignatureLength;
+    rc = SDFR_Execute(hSessionHandle, &req, &rsp);
+    if (rc != SDR_OK)
+        return rc;
+    return (rsp.lVerifyResult == 1) ? SDR_OK : SDR_VERIFYERR;
+}
+
+LONG SDF_ExternalVerify(HANDLE hSessionHandle, ULONG uiAlgID,
+                        const void *pucPublicKeyOrHandle,
+                        const BYTE *pucData, ULONG uiDataLength,
+                        const BYTE *pucSignature, ULONG uiSignatureLength)
+{
+    SDFR_REQUEST req;
+    SDFR_RESPONSE rsp;
+    LONG rc;
+
+    if (hSessionHandle == NULL || pucPublicKeyOrHandle == NULL ||
+        pucData == NULL || pucSignature == NULL || uiSignatureLength == 0)
+        return SDR_INARGERR;
+
+    if (uiAlgID == SGD_SM2 || uiAlgID == SGD_SM2_1 ||
+        uiAlgID == SGD_SM2_2 || uiAlgID == SGD_SM2_3) {
+        if (uiSignatureLength < (ULONG)sizeof(ECCSignature))
+            return SDR_INARGERR;
+        return SDF_ExternalVerify_ECC(hSessionHandle, uiAlgID,
+                                      (ECCrefPublicKey *)pucPublicKeyOrHandle,
+                                      (BYTE *)pucData, uiDataLength,
+                                      (ECCSignature *)pucSignature);
+    }
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_VERIFY;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = (HANDLE)pucPublicKeyOrHandle;
+    req.pucInput = pucData;
+    req.uiInputLength = uiDataLength;
+    req.pucExtraInput = pucSignature;
+    req.uiExtraInputLength = uiSignatureLength;
+
+    rc = SDFR_Execute(hSessionHandle, &req, &rsp);
+    if (rc != SDR_OK)
+        return rc;
+    return (rsp.lVerifyResult == 1) ? SDR_OK : SDR_VERIFYERR;
+}
+
 LONG SDF_ExternalPublicKeyOperation_RSA(HANDLE hSessionHandle,
                                         RSArefPublicKey *pucPublicKey,
                                         BYTE *pucDataInput, ULONG uiInputLength,

@@ -262,6 +262,25 @@ LONG SDF_ImportKeyWithKEK(HANDLE hSessionHandle, ULONG uiAlgID,
                           HANDLE *phKeyHandle);
 LONG SDF_DestroyKey(HANDLE hSessionHandle, HANDLE hKeyHandle);
 
+/* 统一非对称业务接口（收敛旧接口） */
+LONG SDF_ExternalPublicKeyOperation(HANDLE hSessionHandle, ULONG uiAlgID,
+                                    ULONG uiOpType,
+                                    const void *pucPublicKeyOrHandle,
+                                    const BYTE *pucDataInput, ULONG uiInputLength,
+                                    BYTE *pucDataOutput, ULONG *puiOutputLength);
+LONG SDF_InternalSign(HANDLE hSessionHandle, ULONG uiAlgID, ULONG uiISKIndex,
+                      const void *pucPrivateKeyOrHandle,
+                      const BYTE *pucData, ULONG uiDataLength,
+                      BYTE *pucSignature, ULONG *puiSignatureLength);
+LONG SDF_InternalVerify(HANDLE hSessionHandle, ULONG uiAlgID, ULONG uiIPKIndex,
+                        const void *pucPublicKeyOrHandle,
+                        const BYTE *pucData, ULONG uiDataLength,
+                        const BYTE *pucSignature, ULONG uiSignatureLength);
+LONG SDF_ExternalVerify(HANDLE hSessionHandle, ULONG uiAlgID,
+                        const void *pucPublicKeyOrHandle,
+                        const BYTE *pucData, ULONG uiDataLength,
+                        const BYTE *pucSignature, ULONG uiSignatureLength);
+
 /* 6.4 非对称算法运算类函数 */
 LONG SDF_ExternalPublicKeyOperation_RSA(HANDLE hSessionHandle,
                                         RSArefPublicKey *pucPublicKey,
