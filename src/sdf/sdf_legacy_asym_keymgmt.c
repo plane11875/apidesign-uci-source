@@ -1708,6 +1708,104 @@ LONG SDF_ExternalPublicKeyOperation_RSA(HANDLE hSessionHandle,
     return rc;
 }
 
+
+LONG SDF_InternalPublicKeyOperation(HANDLE hSessionHandle, ULONG uiAlgID,
+                                    ULONG uiKeyIndex,
+                                    const void *pucPublicKeyOrHandle,
+                                    const BYTE *pucDataInput, ULONG uiInputLength,
+                                    BYTE *pucDataOutput, ULONG *puiOutputLength)
+{
+    SDFR_REQUEST req;
+    SDFR_RESPONSE rsp;
+    HANDLE hPub = NULL;
+    LONG rc;
+
+    if (hSessionHandle == NULL || pucDataInput == NULL ||
+        puiOutputLength == NULL || (pucDataOutput == NULL && *puiOutputLength != 0))
+        return SDR_INARGERR;
+
+    if (uiAlgID == SGD_RSA)
+        return SDF_InternalPublicKeyOperation_RSA(hSessionHandle, uiKeyIndex,
+                                                  (BYTE *)pucDataInput, uiInputLength,
+                                                  pucDataOutput, puiOutputLength);
+
+    if (uiAlgID == SGD_SM2 || uiAlgID == SGD_SM2_1 ||
+        uiAlgID == SGD_SM2_2 || uiAlgID == SGD_SM2_3) {
+        if (pucPublicKeyOrHandle == NULL)
+            return SDR_INARGERR;
+        return SDF_ExternalPublicKeyOperation(hSessionHandle, uiAlgID,
+                                              SDFR_OP_PKEY_ENCRYPT,
+                                              pucPublicKeyOrHandle,
+                                              pucDataInput, uiInputLength,
+                                              pucDataOutput, puiOutputLength);
+    }
+
+    if (pucPublicKeyOrHandle != NULL)
+        hPub = (HANDLE)pucPublicKeyOrHandle;
+    else {
+        rc = sdf_store_get_internal_key(hSessionHandle, uiKeyIndex, 1, &hPub);
+        if (rc != SDR_OK)
+            return rc;
+    }
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_PKEY_ENCRYPT;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = hPub;
+    req.pucInput = pucDataInput;
+    req.uiInputLength = uiInputLength;
+    rsp.pucOutput = pucDataOutput;
+    rsp.puiOutputLength = puiOutputLength;
+
+    return SDFR_Execute(hSessionHandle, &req, &rsp);
+}
+
+LONG SDF_InternalPrivateKeyOperation(HANDLE hSessionHandle, ULONG uiAlgID,
+                                     ULONG uiKeyIndex,
+                                     const void *pucPrivateKeyOrHandle,
+                                     const BYTE *pucDataInput, ULONG uiInputLength,
+                                     BYTE *pucDataOutput, ULONG *puiOutputLength)
+{
+    SDFR_REQUEST req;
+    SDFR_RESPONSE rsp;
+    HANDLE hPrv = NULL;
+    LONG rc;
+
+    if (hSessionHandle == NULL || pucDataInput == NULL ||
+        puiOutputLength == NULL || (pucDataOutput == NULL && *puiOutputLength != 0))
+        return SDR_INARGERR;
+
+    if (uiAlgID == SGD_RSA)
+        return SDF_InternalPrivateKeyOperation_RSA(hSessionHandle, uiKeyIndex,
+                                                   (BYTE *)pucDataInput, uiInputLength,
+                                                   pucDataOutput, puiOutputLength);
+
+    if (uiAlgID == SGD_SM2 || uiAlgID == SGD_SM2_1 ||
+        uiAlgID == SGD_SM2_2 || uiAlgID == SGD_SM2_3)
+        return SDR_NOTSUPPORT;
+
+    if (pucPrivateKeyOrHandle != NULL)
+        hPrv = (HANDLE)pucPrivateKeyOrHandle;
+    else {
+        rc = sdf_store_get_internal_key(hSessionHandle, uiKeyIndex, 1, &hPrv);
+        if (rc != SDR_OK)
+            return rc;
+    }
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_PKEY_DECRYPT;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = hPrv;
+    req.pucInput = pucDataInput;
+    req.uiInputLength = uiInputLength;
+    rsp.pucOutput = pucDataOutput;
+    rsp.puiOutputLength = puiOutputLength;
+
+    return SDFR_Execute(hSessionHandle, &req, &rsp);
+}
+
 LONG SDF_InternalPublicKeyOperation_RSA(HANDLE hSessionHandle,
                                         ULONG uiKeyIndex, BYTE *pucDataInput,
                                         ULONG uiInputLength, BYTE *pucDataOutput,

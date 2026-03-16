@@ -50,6 +50,7 @@
 - [x] 新增统一接口 `SDF_ExportSignPublicKey(algId, keyIndex, ...)`；覆盖并替代业务动作：`SDF_ExportSignPublicKey_RSA` / `SDF_ExportSignPublicKey_ECC`（已实现：RSA/ECC 路由 + 统一长度回填；`test_sdf_export_sign_public_unified` 验证旧新一致）
 - [x] 新增统一接口 `SDF_ExportEncPublicKey(algId, keyIndex, ...)`；覆盖并替代业务动作：`SDF_ExportEncPublicKey_RSA` / `SDF_ExportEncPublicKey_ECC`（已实现：RSA/ECC 路由 + 统一长度回填；`test_sdf_export_enc_public_unified` 验证旧新一致）
 - [x] 新增统一接口 `SDF_ExternalPublicKeyOperation(algId, opType, ...)`；统一承载现有 `RSA` 外部公钥运算与 `ECC` 外部加密业务（已实现：RSA/ECC 统一入口 + 非映射算法 SDFR 路由；`test_sdf_op_sign_verify_unified` 验证）
+- [x] 新增统一接口 `SDF_InternalPublicKeyOperation(algId, ...)` / `SDF_InternalPrivateKeyOperation(algId, ...)`；覆盖并替代业务动作：`SDF_InternalPublicKeyOperation_RSA` / `SDF_InternalPrivateKeyOperation_RSA`（已实现：RSA 对偶操作统一入口；`test_sdf_internal_op_unified` 验证旧新语义一致）
 - [x] 新增统一接口 `SDF_InternalSign(algId, ...)` / `SDF_InternalVerify(algId, ...)` / `SDF_ExternalVerify(algId, ...)`；逐步收敛 `ECC` 专用签名验签接口（已实现：ECC 兼容层 + 非映射算法 SDFR 路由；`test_sdf_op_sign_verify_unified` 验证）
 - [x] 建立统一分发规则：有 `algId` 映射优先走 `SDFR`，无映射走 legacy 回退（已在 EPK/IPK/ISK/Unified Op-Sign-Verify 路径落地并通过回归）
 - [x] 保留旧标准接口（兼容层），旧接口内部转调统一接口，不直接删除（已保留全部旧符号并完成内部转调）

@@ -280,6 +280,16 @@ LONG SDF_ExternalVerify(HANDLE hSessionHandle, ULONG uiAlgID,
                         const void *pucPublicKeyOrHandle,
                         const BYTE *pucData, ULONG uiDataLength,
                         const BYTE *pucSignature, ULONG uiSignatureLength);
+LONG SDF_InternalPublicKeyOperation(HANDLE hSessionHandle, ULONG uiAlgID,
+                                    ULONG uiKeyIndex,
+                                    const void *pucPublicKeyOrHandle,
+                                    const BYTE *pucDataInput, ULONG uiInputLength,
+                                    BYTE *pucDataOutput, ULONG *puiOutputLength);
+LONG SDF_InternalPrivateKeyOperation(HANDLE hSessionHandle, ULONG uiAlgID,
+                                     ULONG uiKeyIndex,
+                                     const void *pucPrivateKeyOrHandle,
+                                     const BYTE *pucDataInput, ULONG uiInputLength,
+                                     BYTE *pucDataOutput, ULONG *puiOutputLength);
 
 /* 6.4 非对称算法运算类函数 */
 LONG SDF_ExternalPublicKeyOperation_RSA(HANDLE hSessionHandle,

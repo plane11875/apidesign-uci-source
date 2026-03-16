@@ -65,5 +65,8 @@ target_link_libraries(test_sdf_export_enc_public_unified uci OpenSSL::Crypto)
 add_executable(test_sdf_op_sign_verify_unified tests/test_sdf_op_sign_verify_unified.c)
 target_link_libraries(test_sdf_op_sign_verify_unified uci OpenSSL::Crypto)
 
+add_executable(test_sdf_internal_op_unified tests/test_sdf_internal_op_unified.c)
+target_link_libraries(test_sdf_internal_op_unified uci OpenSSL::Crypto)
+
 add_executable(test_equiv_matrix tests/test_equiv_matrix.c)
 target_link_libraries(test_equiv_matrix uci OpenSSL::Crypto)
