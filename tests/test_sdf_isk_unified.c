@@ -6,6 +6,43 @@
 
 #include "uci/sdf.h"
 
+#include <openssl/evp.h>
+
+static void print_sha256_hex(const char *tag, const BYTE *buf, ULONG len)
+{
+    EVP_MD_CTX *ctx = NULL;
+    unsigned char md[EVP_MAX_MD_SIZE];
+    unsigned int md_len = 0;
+    size_t i;
+
+    if (buf == NULL || len == 0) {
+        printf("[HASH] %s sha256=NA len=%u\n", tag, (unsigned)len);
+        return;
+    }
+
+    ctx = EVP_MD_CTX_new();
+    if (ctx == NULL) {
+        printf("[HASH] %s sha256=ERR len=%u\n", tag, (unsigned)len);
+        return;
+    }
+
+    if (EVP_DigestInit_ex(ctx, EVP_sha256(), NULL) != 1 ||
+        EVP_DigestUpdate(ctx, buf, (size_t)len) != 1 ||
+        EVP_DigestFinal_ex(ctx, md, &md_len) != 1) {
+        EVP_MD_CTX_free(ctx);
+        printf("[HASH] %s sha256=ERR len=%u\n", tag, (unsigned)len);
+        return;
+    }
+
+    printf("[HASH] %s sha256=", tag);
+    for (i = 0; i < (size_t)md_len; ++i)
+        printf("%02x", md[i]);
+    printf(" len=%u\n", (unsigned)len);
+
+    EVP_MD_CTX_free(ctx);
+}
+
+
 #define DEFAULT_PQ_ALGID  ((ULONG)0x00F0D502u)
 #define DEFAULT_PQ_ALG    "mlkem768"
 
@@ -63,6 +100,7 @@ static int test_rsa(HANDLE sess)
         return 0;
     }
 
+    print_sha256_hex("ISK.RSA.ct", enc, enc_len);
     (void)SDF_DestroyKey(sess, imported);
     printf("[PASS] unified ISK RSA ok, enc_len=%u\n", (unsigned)enc_len);
     return 1;
@@ -101,6 +139,7 @@ static int test_ecc(HANDLE sess)
         return 0;
     }
 
+    print_sha256_hex("ISK.ECC.ct", enc, enc_len);
     (void)SDF_DestroyKey(sess, imported);
     printf("[PASS] unified ISK ECC ok, enc_len=%u\n", (unsigned)enc_len);
     return 1;
@@ -261,6 +300,8 @@ static int test_pq(HANDLE sess)
         }
     }
 
+    print_sha256_hex("ISK.ct", ct, ct_len);
+    print_sha256_hex("ISK.ss", ss_dec, ss_dec_len);
     printf("[PASS] unified ISK PQ ok alg=%s(0x%08X) ct_len=%u ss_len=%u\n",
            pq_alg, (unsigned)pq_algid, (unsigned)ct_len, (unsigned)ss_dec_len);
 
