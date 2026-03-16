@@ -883,13 +883,21 @@ LONG SDF_GenerateKeyWithEPK(HANDLE hSessionHandle, ULONG uiKeyBits,
     if (uiAlgID == SGD_SM2 || uiAlgID == SGD_SM2_1 ||
         uiAlgID == SGD_SM2_2 || uiAlgID == SGD_SM2_3) {
         LONG rc;
-        if (pucPublicKey == NULL || pucKey == NULL || *puiKeyLength < sizeof(ECCCipher))
+        ULONG session_len;
+        ULONG need;
+        if (pucPublicKey == NULL || pucKey == NULL)
             return SDR_INARGERR;
+
+        session_len = bytes_from_bits(uiKeyBits);
+        need = (ULONG)sizeof(ECCCipher) + session_len - 1u;
+        if (session_len == 0 || *puiKeyLength < need)
+            return SDR_OUTARGERR;
+
         rc = legacy_SDF_GenerateKeyWithEPK_ECC(hSessionHandle, uiKeyBits, uiAlgID,
                                                (ECCrefPublicKey *)pucPublicKey,
                                                (ECCCipher *)pucKey, phKeyHandle);
         if (rc == SDR_OK)
-            *puiKeyLength = sizeof(ECCCipher);
+            *puiKeyLength = need;
         return rc;
     }
 

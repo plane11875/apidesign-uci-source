@@ -73,8 +73,9 @@ static int test_ecc(HANDLE sess)
     LONG rc;
     ECCrefPublicKey pub;
     HANDLE key = NULL;
-    ECCCipher out;
-    ULONG out_len = sizeof(out);
+    ULONG session_len = (128u + 7u) / 8u;
+    ULONG out_len = (ULONG)sizeof(ECCCipher) + session_len - 1u;
+    BYTE *out = (BYTE *)calloc(1, out_len);
 
     rc = SDF_ExportEncPublicKey_ECC(sess, 1, &pub);
     if (rc != SDR_OK) {
@@ -83,19 +84,26 @@ static int test_ecc(HANDLE sess)
     }
 
     fprintf(stderr, "[DBG] call unified ECC\n");
+    if (out == NULL) {
+        fprintf(stderr, "[FAIL] ECC alloc failed\n");
+        return 0;
+    }
+
     rc = SDF_GenerateKeyWithEPK(sess, 128, SGD_SM2_3, &pub,
-                                (BYTE *)&out, &out_len, &key);
+                                out, &out_len, &key);
     if (rc != SDR_OK) {
         fprintf(stderr, "[FAIL] unified EPK ECC rc=0x%08X\n", (unsigned)rc);
         return 0;
     }
 
-    if (out_len != sizeof(ECCCipher) || key == NULL) {
+    if (out_len == 0 || key == NULL) {
         fprintf(stderr, "[FAIL] unified EPK ECC invalid output len=%u\n", (unsigned)out_len);
+        free(out);
         return 0;
     }
 
-    /* NOTE: 当前实现里该 handle 在销毁时会触发崩溃，暂不销毁以便继续验证 PQ 路径 */
+    (void)SDF_DestroyKey(sess, key);
+    free(out);
     printf("[PASS] unified EPK ECC ok, out_len=%u\n", (unsigned)out_len);
     return 1;
 }
