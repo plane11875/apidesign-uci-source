@@ -189,6 +189,13 @@ LONG SDF_ExportSignPublicKey_ECC(HANDLE hSessionHandle, ULONG uiKeyIndex,
                                  ECCrefPublicKey *pucPublicKey);
 LONG SDF_ExportEncPublicKey_ECC(HANDLE hSessionHandle, ULONG uiKeyIndex,
                                 ECCrefPublicKey *pucPublicKey);
+
+/* 统一签名公钥导出接口：RSA 输出 RSArefPublicKey，SM2/ECC 输出 ECCrefPublicKey。
+ * 通过 uiAlgID 选择导出格式，输出缓冲长度由 puiKeyLength 传入/回填。
+ */
+LONG SDF_ExportSignPublicKey(HANDLE hSessionHandle, ULONG uiAlgID,
+                             ULONG uiKeyIndex, BYTE *pucPublicKey,
+                             ULONG *puiKeyLength);
 LONG SDF_GenerateKeyWithIPK_ECC(HANDLE hSessionHandle, ULONG uiIPKIndex,
                                 ULONG uiKeyBits, ECCCipher *pucKey,
                                 HANDLE *phKeyHandle);

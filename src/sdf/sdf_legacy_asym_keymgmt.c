@@ -568,6 +568,46 @@ LONG SDF_ExportEncPublicKey_ECC(HANDLE hSessionHandle, ULONG uiKeyIndex,
     return SDF_ExportSignPublicKey_ECC(hSessionHandle, uiKeyIndex, pucPublicKey);
 }
 
+
+LONG SDF_ExportSignPublicKey(HANDLE hSessionHandle, ULONG uiAlgID,
+                             ULONG uiKeyIndex, BYTE *pucPublicKey,
+                             ULONG *puiKeyLength)
+{
+    LONG rc;
+
+    if (hSessionHandle == NULL || pucPublicKey == NULL || puiKeyLength == NULL)
+        return SDR_INARGERR;
+
+    if (uiAlgID == SGD_RSA) {
+        if (*puiKeyLength < (ULONG)sizeof(RSArefPublicKey)) {
+            *puiKeyLength = (ULONG)sizeof(RSArefPublicKey);
+            return SDR_OUTARGERR;
+        }
+
+        rc = SDF_ExportSignPublicKey_RSA(hSessionHandle, uiKeyIndex,
+                                         (RSArefPublicKey *)pucPublicKey);
+        if (rc == SDR_OK)
+            *puiKeyLength = (ULONG)sizeof(RSArefPublicKey);
+        return rc;
+    }
+
+    if (uiAlgID == SGD_SM2 || uiAlgID == SGD_SM2_1 ||
+        uiAlgID == SGD_SM2_2 || uiAlgID == SGD_SM2_3) {
+        if (*puiKeyLength < (ULONG)sizeof(ECCrefPublicKey)) {
+            *puiKeyLength = (ULONG)sizeof(ECCrefPublicKey);
+            return SDR_OUTARGERR;
+        }
+
+        rc = SDF_ExportSignPublicKey_ECC(hSessionHandle, uiKeyIndex,
+                                         (ECCrefPublicKey *)pucPublicKey);
+        if (rc == SDR_OK)
+            *puiKeyLength = (ULONG)sizeof(ECCrefPublicKey);
+        return rc;
+    }
+
+    return SDR_ALGNOTSUPPORT;
+}
+
 static LONG legacy_SDF_GenerateKeyWithIPK_RSA(HANDLE hSessionHandle, ULONG uiIPKIndex,
                                         ULONG uiKeyBits, BYTE *pucKey,
                                         ULONG *puiKeyLength, HANDLE *phKeyHandle)
