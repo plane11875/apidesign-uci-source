@@ -196,6 +196,9 @@ LONG SDF_ExportEncPublicKey_ECC(HANDLE hSessionHandle, ULONG uiKeyIndex,
 LONG SDF_ExportSignPublicKey(HANDLE hSessionHandle, ULONG uiAlgID,
                              ULONG uiKeyIndex, BYTE *pucPublicKey,
                              ULONG *puiKeyLength);
+LONG SDF_ExportEncPublicKey(HANDLE hSessionHandle, ULONG uiAlgID,
+                            ULONG uiKeyIndex, BYTE *pucPublicKey,
+                            ULONG *puiKeyLength);
 LONG SDF_GenerateKeyWithIPK_ECC(HANDLE hSessionHandle, ULONG uiIPKIndex,
                                 ULONG uiKeyBits, ECCCipher *pucKey,
                                 HANDLE *phKeyHandle);

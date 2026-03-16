@@ -47,8 +47,8 @@
 - [x] 新增统一接口 `SDF_GenerateKeyWithEPK(algId, ...)`，内部按 `algId` 分发；覆盖并替代业务动作：`SDF_GenerateKeyWithEPK_RSA` / `SDF_GenerateKeyWithEPK_ECC`（已实现：SDFR优先，legacy回退；已修复 ECC 变长输出缓冲越界）
 - [x] 新增统一接口 `SDF_GenerateKeyWithIPK(algId, ...)`；覆盖并替代业务动作：`SDF_GenerateKeyWithIPK_RSA` / `SDF_GenerateKeyWithIPK_ECC`（已实现：SDFR优先，legacy回退；RSA/ECC/PQ 实测通过）
 - [x] 新增统一接口 `SDF_ImportKeyWithISK(algId, ...)`；覆盖并替代业务动作：`SDF_ImportKeyWithISK_RSA` / `SDF_ImportKeyWithISK_ECC`（已实现：SDFR优先，legacy回退；RSA/ECC/PQ 实测通过）
-- [ ] 新增统一接口 `SDF_ExportSignPublicKey(algId, keyIndex, ...)`；覆盖并替代业务动作：`SDF_ExportSignPublicKey_RSA` / `SDF_ExportSignPublicKey_ECC`
-- [ ] 新增统一接口 `SDF_ExportEncPublicKey(algId, keyIndex, ...)`；覆盖并替代业务动作：`SDF_ExportEncPublicKey_RSA` / `SDF_ExportEncPublicKey_ECC`
+- [x] 新增统一接口 `SDF_ExportSignPublicKey(algId, keyIndex, ...)`；覆盖并替代业务动作：`SDF_ExportSignPublicKey_RSA` / `SDF_ExportSignPublicKey_ECC`（已实现：RSA/ECC 路由 + 统一长度回填；`test_sdf_export_sign_public_unified` 验证旧新一致）
+- [x] 新增统一接口 `SDF_ExportEncPublicKey(algId, keyIndex, ...)`；覆盖并替代业务动作：`SDF_ExportEncPublicKey_RSA` / `SDF_ExportEncPublicKey_ECC`（已实现：RSA/ECC 路由 + 统一长度回填；`test_sdf_export_enc_public_unified` 验证旧新一致）
 - [ ] 新增统一接口 `SDF_ExternalPublicKeyOperation(algId, opType, ...)`；统一承载现有 `RSA` 外部公钥运算与 `ECC` 外部加密业务
 - [ ] 新增统一接口 `SDF_InternalSign(algId, ...)` / `SDF_InternalVerify(algId, ...)` / `SDF_ExternalVerify(algId, ...)`；逐步收敛 `ECC` 专用签名验签接口
 - [ ] 建立统一分发规则：有 `algId` 映射优先走 `SDFR`，无映射走 legacy 回退
