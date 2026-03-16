@@ -41,8 +41,8 @@
 
 ## TODO（统一业务接口，策略1：保留旧 SDF 接口并内部转调）
 
-> 提示：这里是接口改造清单，不是独立任务列表；每一项打勾前必须完成“旧接口 vs 新接口 + OpenSSL/liboqs 对照”的结果一致性验证（不能只看是否报错）。
-> 强制要求：必须给出可核对的结果一致性对比数据；必须覆盖后量子变种算法（不仅是标准基线算法），变种未通过则该项不得打勾。
+> 要求1：每一项打勾前，必须完成“OpenSSL/liboqs 直调结果 vs SDF 接口结果”对比，并给出可核对数据（长度/哈希/验签结果）；只看 PASS 不算通过。
+> 要求2：必须完成变种算法测试并通过：KEM 变种 `frodo640shake`、`efrodo640aes`；DSA 变种 `mldsa65`（后续新增变种需补充到此清单）。
 
 - [x] 新增统一接口 `SDF_GenerateKeyWithEPK(algId, ...)`，内部按 `algId` 分发；覆盖并替代业务动作：`SDF_GenerateKeyWithEPK_RSA` / `SDF_GenerateKeyWithEPK_ECC`（已实现：SDFR优先，legacy回退；已修复 ECC 变长输出缓冲越界）
 - [x] 新增统一接口 `SDF_GenerateKeyWithIPK(algId, ...)`；覆盖并替代业务动作：`SDF_GenerateKeyWithIPK_RSA` / `SDF_GenerateKeyWithIPK_ECC`（已实现：SDFR优先，legacy回退；RSA/ECC/PQ 实测通过）
