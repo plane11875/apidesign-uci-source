@@ -614,9 +614,9 @@ LONG SDF_GenerateKeyWithIPK_RSA(HANDLE hSessionHandle, ULONG uiIPKIndex,
     return SDR_OK;
 }
 
-LONG SDF_GenerateKeyWithEPK_RSA(HANDLE hSessionHandle, ULONG uiKeyBits,
-                                RSArefPublicKey *pucPublicKey, BYTE *pucKey,
-                                ULONG *puiKeyLength, HANDLE *phKeyHandle)
+static LONG legacy_SDF_GenerateKeyWithEPK_RSA(HANDLE hSessionHandle, ULONG uiKeyBits,
+                                       RSArefPublicKey *pucPublicKey, BYTE *pucKey,
+                                       ULONG *puiKeyLength, HANDLE *phKeyHandle)
 {
     HANDLE hPub = NULL;
     BYTE *session = NULL;
@@ -703,9 +703,9 @@ LONG SDF_ImportKeyWithISK_RSA(HANDLE hSessionHandle, ULONG uiISKIndex,
     return rc;
 }
 
-LONG SDF_GenerateKeyWithEPK_ECC(HANDLE hSessionHandle, ULONG uiKeyBits,
-                                ULONG uiAlgID, ECCrefPublicKey *pucPublicKey,
-                                ECCCipher *pucKey, HANDLE *phKeyHandle)
+static LONG legacy_SDF_GenerateKeyWithEPK_ECC(HANDLE hSessionHandle, ULONG uiKeyBits,
+                                       ULONG uiAlgID, ECCrefPublicKey *pucPublicKey,
+                                       ECCCipher *pucKey, HANDLE *phKeyHandle)
 {
     BYTE *session = NULL;
     ULONG session_len;
@@ -741,6 +741,178 @@ end:
     OPENSSL_cleanse(session, session_len);
     free(session);
     return rc;
+}
+
+
+
+/* 统一 EPK 路由：
+ * - legacy RSA/ECC：保持标准输入结构，内部回退旧实现。
+ * - 扩展算法：当 uiAlgID 已注册到 SDFR 时，要求 pucPublicKey 传入公钥句柄(HANDLE)。
+ */
+static LONG unified_epk_try_sdfr(HANDLE hSessionHandle, ULONG uiKeyBits, ULONG uiAlgID,
+                                 HANDLE hPublicKey, BYTE *pucKey,
+                                 ULONG *puiKeyLength, HANDLE *phKeyHandle)
+{
+    const CHAR *alg = NULL;
+    const CHAR *props = NULL;
+    SDFR_REQUEST req;
+    SDFR_RESPONSE rsp;
+    BYTE *secret = NULL;
+    BYTE *session = NULL;
+    ULONG secret_len = 0;
+    ULONG ct_len = 0;
+    ULONG session_len = 0;
+    LONG rc;
+
+    if (hPublicKey == NULL || pucKey == NULL || puiKeyLength == NULL || phKeyHandle == NULL)
+        return SDR_INARGERR;
+
+    rc = SDFR_ResolveAlgName(uiAlgID, &alg, &props);
+    if (rc != SDR_OK || alg == NULL)
+        return SDR_ALGNOTSUPPORT;
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_KEM_ENCAPSULATE;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = hPublicKey;
+    rsp.puiOutputLength = &secret_len;
+    rsp.puiExtraOutputLength = &ct_len;
+    rc = SDFR_Execute(hSessionHandle, &req, &rsp);
+    if (rc == SDR_OK && secret_len > 0 && ct_len > 0) {
+        if (*puiKeyLength < ct_len)
+            return SDR_OUTARGERR;
+
+        secret = (BYTE *)malloc(secret_len);
+        if (secret == NULL)
+            return SDR_NOBUFFER;
+
+        memset(&req, 0, sizeof(req));
+        memset(&rsp, 0, sizeof(rsp));
+        req.uiOperation = SDFR_OP_KEM_ENCAPSULATE;
+        req.uiAlgID = uiAlgID;
+        req.hKeyHandle = hPublicKey;
+        rsp.pucOutput = secret;
+        rsp.puiOutputLength = &secret_len;
+        rsp.pucExtraOutput = pucKey;
+        rsp.puiExtraOutputLength = &ct_len;
+
+        rc = SDFR_Execute(hSessionHandle, &req, &rsp);
+        if (rc == SDR_OK)
+            rc = SDFU_ImportKey(hSessionHandle, secret, secret_len, phKeyHandle);
+
+        OPENSSL_cleanse(secret, secret_len);
+        free(secret);
+
+        if (rc == SDR_OK)
+            *puiKeyLength = ct_len;
+        return rc;
+    }
+
+    session_len = bytes_from_bits(uiKeyBits);
+    session = (BYTE *)malloc(session_len);
+    if (session == NULL)
+        return SDR_NOBUFFER;
+
+    rc = SDF_GenerateRandom(hSessionHandle, session_len, session);
+    if (rc != SDR_OK) {
+        free(session);
+        return rc;
+    }
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_PKEY_ENCRYPT;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = hPublicKey;
+    req.pucInput = session;
+    req.uiInputLength = session_len;
+    rsp.puiOutputLength = &ct_len;
+
+    rc = SDFR_Execute(hSessionHandle, &req, &rsp);
+    if (rc != SDR_OK || ct_len == 0) {
+        OPENSSL_cleanse(session, session_len);
+        free(session);
+        return (rc == SDR_OK) ? SDR_ALGNOTSUPPORT : rc;
+    }
+
+    if (*puiKeyLength < ct_len) {
+        OPENSSL_cleanse(session, session_len);
+        free(session);
+        return SDR_OUTARGERR;
+    }
+
+    memset(&req, 0, sizeof(req));
+    memset(&rsp, 0, sizeof(rsp));
+    req.uiOperation = SDFR_OP_PKEY_ENCRYPT;
+    req.uiAlgID = uiAlgID;
+    req.hKeyHandle = hPublicKey;
+    req.pucInput = session;
+    req.uiInputLength = session_len;
+    rsp.pucOutput = pucKey;
+    rsp.puiOutputLength = &ct_len;
+
+    rc = SDFR_Execute(hSessionHandle, &req, &rsp);
+    if (rc == SDR_OK)
+        rc = SDFU_ImportKey(hSessionHandle, session, session_len, phKeyHandle);
+
+    OPENSSL_cleanse(session, session_len);
+    free(session);
+
+    if (rc == SDR_OK)
+        *puiKeyLength = ct_len;
+    return rc;
+}
+
+LONG SDF_GenerateKeyWithEPK(HANDLE hSessionHandle, ULONG uiKeyBits,
+                            ULONG uiAlgID, const void *pucPublicKey,
+                            BYTE *pucKey, ULONG *puiKeyLength,
+                            HANDLE *phKeyHandle)
+{
+    if (hSessionHandle == NULL || puiKeyLength == NULL || phKeyHandle == NULL)
+        return SDR_INARGERR;
+
+    if (uiAlgID == SGD_RSA) {
+        if (pucPublicKey == NULL)
+            return SDR_INARGERR;
+        return legacy_SDF_GenerateKeyWithEPK_RSA(hSessionHandle, uiKeyBits,
+                                                 (RSArefPublicKey *)pucPublicKey,
+                                                 pucKey, puiKeyLength, phKeyHandle);
+    }
+
+    if (uiAlgID == SGD_SM2 || uiAlgID == SGD_SM2_1 ||
+        uiAlgID == SGD_SM2_2 || uiAlgID == SGD_SM2_3) {
+        LONG rc;
+        if (pucPublicKey == NULL || pucKey == NULL || *puiKeyLength < sizeof(ECCCipher))
+            return SDR_INARGERR;
+        rc = legacy_SDF_GenerateKeyWithEPK_ECC(hSessionHandle, uiKeyBits, uiAlgID,
+                                               (ECCrefPublicKey *)pucPublicKey,
+                                               (ECCCipher *)pucKey, phKeyHandle);
+        if (rc == SDR_OK)
+            *puiKeyLength = sizeof(ECCCipher);
+        return rc;
+    }
+
+    return unified_epk_try_sdfr(hSessionHandle, uiKeyBits, uiAlgID,
+                                (HANDLE)pucPublicKey, pucKey, puiKeyLength,
+                                phKeyHandle);
+}
+
+LONG SDF_GenerateKeyWithEPK_RSA(HANDLE hSessionHandle, ULONG uiKeyBits,
+                                RSArefPublicKey *pucPublicKey, BYTE *pucKey,
+                                ULONG *puiKeyLength, HANDLE *phKeyHandle)
+{
+    return SDF_GenerateKeyWithEPK(hSessionHandle, uiKeyBits, SGD_RSA,
+                                  pucPublicKey, pucKey, puiKeyLength,
+                                  phKeyHandle);
+}
+
+LONG SDF_GenerateKeyWithEPK_ECC(HANDLE hSessionHandle, ULONG uiKeyBits,
+                                ULONG uiAlgID, ECCrefPublicKey *pucPublicKey,
+                                ECCCipher *pucKey, HANDLE *phKeyHandle)
+{
+    return legacy_SDF_GenerateKeyWithEPK_ECC(hSessionHandle, uiKeyBits, uiAlgID,
+                                             pucPublicKey, pucKey, phKeyHandle);
 }
 
 LONG SDF_ImportKeyWithISK_ECC(HANDLE hSessionHandle, ULONG uiISKIndex,

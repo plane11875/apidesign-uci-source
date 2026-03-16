@@ -195,6 +195,15 @@ LONG SDF_GenerateKeyWithIPK_ECC(HANDLE hSessionHandle, ULONG uiIPKIndex,
 LONG SDF_GenerateKeyWithEPK_ECC(HANDLE hSessionHandle, ULONG uiKeyBits,
                                 ULONG uiAlgID, ECCrefPublicKey *pucPublicKey,
                                 ECCCipher *pucKey, HANDLE *phKeyHandle);
+
+/* 统一公钥封装接口：按 uiAlgID 优先走 SDFR 路由，失败时回退 legacy。
+ * pucPublicKey: 兼容层参数，legacy RSA 传 RSArefPublicKey*，legacy ECC 传 ECCrefPublicKey*。
+ * pucKey/puiKeyLength: 统一输出密文缓冲与长度。
+ */
+LONG SDF_GenerateKeyWithEPK(HANDLE hSessionHandle, ULONG uiKeyBits,
+                            ULONG uiAlgID, const void *pucPublicKey,
+                            BYTE *pucKey, ULONG *puiKeyLength,
+                            HANDLE *phKeyHandle);
 LONG SDF_ImportKeyWithISK_ECC(HANDLE hSessionHandle, ULONG uiISKIndex,
                               ECCCipher *pucKey, HANDLE *phKeyHandle);
 LONG SDF_GenerateAgreementDataWithECC(HANDLE hSessionHandle, ULONG uiISKIndex,

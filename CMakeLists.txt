@@ -36,3 +36,16 @@ target_link_libraries(uci OpenSSL::Crypto)
 # 安装规则
 install(TARGETS uci DESTINATION lib)
 install(DIRECTORY include/uci DESTINATION include)
+
+
+add_executable(test_sdfu_rsa_ecc tests/test_sdfu_rsa_ecc.c)
+target_link_libraries(test_sdfu_rsa_ecc uci OpenSSL::Crypto)
+
+add_executable(test_sdfr_pq tests/test_sdfr_pq.c)
+target_link_libraries(test_sdfr_pq uci OpenSSL::Crypto)
+
+add_executable(test_sdf_epk_unified tests/test_sdf_epk_unified.c)
+target_link_libraries(test_sdf_epk_unified uci OpenSSL::Crypto)
+
+add_executable(test_sdfu_myoqsprov_pq tests/test_sdfu_myoqsprov_pq.c)
+target_link_libraries(test_sdfu_myoqsprov_pq uci OpenSSL::Crypto)
