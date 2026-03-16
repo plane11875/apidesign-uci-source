@@ -42,7 +42,7 @@
 ## TODO（统一业务接口，策略1：保留旧 SDF 接口并内部转调）
 
 - [x] 新增统一接口 `SDF_GenerateKeyWithEPK(algId, ...)`，内部按 `algId` 分发；覆盖并替代业务动作：`SDF_GenerateKeyWithEPK_RSA` / `SDF_GenerateKeyWithEPK_ECC`（已实现：SDFR优先，legacy回退；已修复 ECC 变长输出缓冲越界）
-- [ ] 新增统一接口 `SDF_GenerateKeyWithIPK(algId, ...)`；覆盖并替代业务动作：`SDF_GenerateKeyWithIPK_RSA` / `SDF_GenerateKeyWithIPK_ECC`
+- [x] 新增统一接口 `SDF_GenerateKeyWithIPK(algId, ...)`；覆盖并替代业务动作：`SDF_GenerateKeyWithIPK_RSA` / `SDF_GenerateKeyWithIPK_ECC`（已实现：SDFR优先，legacy回退；RSA/ECC/PQ 实测通过）
 - [ ] 新增统一接口 `SDF_ImportKeyWithISK(algId, ...)`；覆盖并替代业务动作：`SDF_ImportKeyWithISK_RSA` / `SDF_ImportKeyWithISK_ECC`
 - [ ] 新增统一接口 `SDF_ExportSignPublicKey(algId, keyIndex, ...)`；覆盖并替代业务动作：`SDF_ExportSignPublicKey_RSA` / `SDF_ExportSignPublicKey_ECC`
 - [ ] 新增统一接口 `SDF_ExportEncPublicKey(algId, keyIndex, ...)`；覆盖并替代业务动作：`SDF_ExportEncPublicKey_RSA` / `SDF_ExportEncPublicKey_ECC`

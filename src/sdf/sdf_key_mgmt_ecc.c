@@ -48,42 +48,18 @@ LONG SDF_GenerateKeyWithIPK_ECC(HANDLE hSessionHandle, ULONG uiIPKIndex,
                                 ULONG uiKeyBits, ECCCipher *pucKey,
                                 HANDLE *phKeyHandle)
 {
-    BYTE *pucSession = NULL;
     ULONG uiSessionLen;
-    HANDLE hInternal = NULL;
-    LONG rc;
+    ULONG out_len;
 
     if (hSessionHandle == NULL || phKeyHandle == NULL || pucKey == NULL)
         return SDR_INARGERR;
 
-    rc = sdf_store_get_internal_key(hSessionHandle, uiIPKIndex, 1, &hInternal);
-    if (rc != SDR_OK)
-        return rc;
-
     uiSessionLen = key_bytes_from_bits(uiKeyBits);
-    pucSession = (BYTE *)malloc(uiSessionLen);
-    if (pucSession == NULL)
-        return SDR_NOBUFFER;
+    out_len = (ULONG)sizeof(ECCCipher) + uiSessionLen - 1u;
 
-    rc = SDF_GenerateRandom(hSessionHandle, uiSessionLen, pucSession);
-    if (rc != SDR_OK) {
-        free(pucSession);
-        return rc;
-    }
-
-    rc = SDFU_ImportKey(hSessionHandle, pucSession, uiSessionLen, phKeyHandle);
-    if (rc != SDR_OK) {
-        memset(pucSession, 0, uiSessionLen);
-        free(pucSession);
-        return rc;
-    }
-
-    fill_dummy_ecc_cipher(hSessionHandle, pucKey, pucSession, uiSessionLen);
-
-    memset(pucSession, 0, uiSessionLen);
-    free(pucSession);
-    (void)hInternal;
-    return SDR_OK;
+    return SDF_GenerateKeyWithIPK(hSessionHandle, uiIPKIndex, uiKeyBits,
+                                  SGD_SM2_3, NULL, (BYTE *)pucKey, &out_len,
+                                  phKeyHandle);
 }
 
 LONG SDF_GenerateAgreementDataWithECC(HANDLE hSessionHandle, ULONG uiISKIndex,

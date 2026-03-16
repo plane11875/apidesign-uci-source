@@ -192,6 +192,15 @@ LONG SDF_ExportEncPublicKey_ECC(HANDLE hSessionHandle, ULONG uiKeyIndex,
 LONG SDF_GenerateKeyWithIPK_ECC(HANDLE hSessionHandle, ULONG uiIPKIndex,
                                 ULONG uiKeyBits, ECCCipher *pucKey,
                                 HANDLE *phKeyHandle);
+
+/* 统一内部公钥封装接口：按 uiAlgID 优先走 SDFR 路由，失败时回退 legacy。
+ * legacy RSA/ECC 仍使用 uiIPKIndex 查内部密钥；扩展算法传 HANDLE 作为内部公钥句柄。
+ */
+LONG SDF_GenerateKeyWithIPK(HANDLE hSessionHandle, ULONG uiIPKIndex,
+                            ULONG uiKeyBits, ULONG uiAlgID,
+                            const void *pucPublicKeyOrHandle,
+                            BYTE *pucKey, ULONG *puiKeyLength,
+                            HANDLE *phKeyHandle);
 LONG SDF_GenerateKeyWithEPK_ECC(HANDLE hSessionHandle, ULONG uiKeyBits,
                                 ULONG uiAlgID, ECCrefPublicKey *pucPublicKey,
                                 ECCCipher *pucKey, HANDLE *phKeyHandle);
